@@ -8,7 +8,7 @@ import (
 func TestBloomFilter(t *testing.T) {
 	maxSize := uint64(1000)
 	falsePositiveRate := 0.001
-	bf := NewBloomFilter(maxSize, falsePositiveRate)
+	bf := New(maxSize, falsePositiveRate)
 
 	// Add values to the Bloom Filter
 	values := []string{"value1", "value2", "value3"}
@@ -57,7 +57,7 @@ func TestBloomFilter(t *testing.T) {
 func BenchmarkBloomFilter_Add(b *testing.B) {
 	maxSize := uint64(1000000)
 	falsePositiveRate := 0.001
-	bf := NewBloomFilter(maxSize, falsePositiveRate)
+	bf := New(maxSize, falsePositiveRate)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

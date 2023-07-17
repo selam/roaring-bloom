@@ -33,7 +33,7 @@ type bf struct {
 	items             uint64
 }
 
-func NewBloomFilter(maxSize uint64, falsePositiveRate float64) BloomFilter {
+func New(maxSize uint64, falsePositiveRate float64) BloomFilter {
 	hashNum := calculateHashNum(falsePositiveRate)
 	bitmapSize := calculateBitmapSize(maxSize, falsePositiveRate)
 	return &bf{
