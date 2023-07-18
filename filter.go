@@ -1,11 +1,8 @@
 package bloomfilter
 
 type BloomFilter interface {
-	Add(value interface{})
-	Contains(value interface{}) bool
-	FalsePositiveRate() float64
-	CurrentFalsePositiveRate() float64
+	Add(value []byte)
+	Contains(value []byte) bool
 	IsEmpty() bool
-	IsFull() bool
 	Size() uint64
 }

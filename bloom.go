@@ -17,27 +17,31 @@ limitations under the License.
 
 */
 import (
-	"fmt"
+	"hash"
 	"hash/fnv"
 	"math"
-	"strconv"
+	"sync"
 
 	"github.com/RoaringBitmap/roaring/roaring64"
 )
 
 type bf struct {
-	bitmap            *roaring64.Bitmap
+	bitmaps           []*roaring64.Bitmap
 	falsePositiveRate float64
 	hashNum           int
 	bitmapSize        uint64
 	items             uint64
 }
 
-func New(maxSize uint64, falsePositiveRate float64) BloomFilter {
-	hashNum := calculateHashNum(falsePositiveRate)
+func New(maxSize uint64, falsePositiveRate float64) *bf {
 	bitmapSize := calculateBitmapSize(maxSize, falsePositiveRate)
+	hashNum := calculateHashNum(bitmapSize, maxSize)
+	bitmaps := make([]*roaring64.Bitmap, hashNum)
+	for i := 0; i < hashNum; i++ {
+		bitmaps[i] = roaring64.NewBitmap()
+	}
 	return &bf{
-		bitmap:            roaring64.NewBitmap(),
+		bitmaps:           bitmaps,
 		falsePositiveRate: falsePositiveRate,
 		hashNum:           hashNum,
 		bitmapSize:        bitmapSize,
@@ -45,19 +49,16 @@ func New(maxSize uint64, falsePositiveRate float64) BloomFilter {
 	}
 }
 
-func (bf *bf) Add(value interface{}) {
+func (bf *bf) Add(value []byte) {
 	bf.items = bf.items + 1
-	for i := 0; i < bf.hashNum; i++ {
-		key := getHash(value, i) % bf.bitmapSize
-		bf.bitmap.Add(key)
+	for i, h := range getHash(value, bf.hashNum, bf.bitmapSize) {
+		bf.bitmaps[i].Add(h)
 	}
 }
 
-func (bf *bf) Contains(value interface{}) bool {
-	// Implement the Contains method of your Bloom Filter
-	for i := 0; i < bf.hashNum; i++ {
-		key := getHash(value, i) % bf.bitmapSize
-		if !bf.bitmap.Contains(key) {
+func (bf *bf) Contains(value []byte) bool {
+	for i, h := range getHash(value, bf.hashNum, bf.bitmapSize) {
+		if !bf.bitmaps[i].Contains(h) {
 			return false
 		}
 	}
@@ -68,17 +69,9 @@ func (bf *bf) FalsePositiveRate() float64 {
 	return bf.falsePositiveRate
 }
 
-func (bf *bf) CurrentFalsePositiveRate() float64 {
-	return float64(bf.bitmap.GetCardinality()) / float64(bf.bitmapSize) / math.Pow(float64(bf.hashNum), 2)
-}
-
 func (bf *bf) IsEmpty() bool {
 	// Implement the IsEmpty method of your Bloom Filter
-	return bf.bitmap.IsEmpty()
-}
-
-func (bf *bf) IsFull() bool {
-	return bf.CurrentFalsePositiveRate() >= bf.FalsePositiveRate()
+	return bf.bitmaps[0].IsEmpty()
 }
 
 func (bf *bf) Size() uint64 {
@@ -87,15 +80,27 @@ func (bf *bf) Size() uint64 {
 }
 
 func calculateBitmapSize(n uint64, f float64) uint64 {
-	return uint64(math.Ceil(float64(n) * math.Log(f) * -1 / math.Pow(2*math.Log(2), 2)))
+	return uint64(math.Ceil(-float64(n) * math.Log(f) / math.Pow(math.Log(2), 2)))
 }
 
-func calculateHashNum(f float64) int {
-	return int(math.Ceil(math.Log2(f) * -1))
+func calculateHashNum(bitSize uint64, items uint64) int {
+	return int(math.Ceil(math.Log(2) * float64(bitSize) / float64(items)))
 }
 
-func getHash(value interface{}, seed int) uint64 {
-	h := fnv.New64a()
-	h.Write([]byte(strconv.Itoa(int(seed)) + fmt.Sprint(value)))
-	return h.Sum64()
+var pool = sync.Pool{
+	New: func() interface{} {
+		return fnv.New64a()
+	},
+}
+
+func getHash(value []byte, hashNum int, bitmapSize uint64) []uint64 {
+	hashes := make([]uint64, hashNum)
+	h := pool.Get().(hash.Hash64)
+	defer pool.Put(h)
+	for i := uint(0); i < uint(hashNum); i++ {
+		h.Reset()
+		h.Write(value)                                     // add a salt to the hash function
+		hashes[i] = uint64(h.Sum64()) % uint64(bitmapSize) // map the hash value to the range [0, m)
+	}
+	return hashes
 }

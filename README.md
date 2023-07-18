@@ -44,18 +44,12 @@ func main() {
 	falsePositiveRate := 0.001
 	bf := bloomfilter.New(maxSize, falsePositiveRate)
 
-	bf.Add("value1")
-	bf.Add("value2")
+	bf.Add([]byte("value1"))
+	bf.Add([]byte("value2"))
 
-	fmt.Println(bf.Contains("value1")) // true
-	fmt.Println(bf.Contains("value3")) // false
+	fmt.Println(bf.Contains([]byte("value1"))) // true
+	fmt.Println(bf.Contains([]byte("value3"))) // false
 
-	fmt.Println("False Positive Rate:", bf.FalsePositiveRate())
-	fmt.Println("Current False Positive Rate:", bf.CurrentFalsePositiveRate())
-	fmt.Println("Is Empty?", bf.IsEmpty())
-	fmt.Println("Is Full?", bf.IsFull())
-	fmt.Println("Size:", bf.Size())
-	fmt.Println("Len:", bf.Len())
 }
 ```
 
